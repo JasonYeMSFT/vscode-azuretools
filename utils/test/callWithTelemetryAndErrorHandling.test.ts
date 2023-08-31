@@ -5,7 +5,7 @@
 
 import * as assert from 'assert';
 import { IActionContext } from '..';
-import { callWithTelemetryAndErrorHandling, callWithTelemetryAndErrorHandlingSync } from '../src/callWithTelemetryAndErrorHandling';
+import { callWithTelemetry, callWithTelemetryAndErrorHandling, callWithTelemetryAndErrorHandlingSync, callWithTelemetrySync } from '../src/callWithTelemetryAndErrorHandling';
 import { assertThrowsAsync } from './assertThrowsAsync';
 
 function testFunc(): string {
@@ -90,5 +90,49 @@ suite('callWithTelemetryAndErrorHandling tests', () => {
             throw new Error('test');
         }
         assert.strictEqual(await callWithTelemetryAndErrorHandling('callbackId', func), undefined);
+    });
+});
+
+suite('callWithTelemetry tests', function () {
+    test('sync', async () => {
+        assert.strictEqual(callWithTelemetrySync('callbackId', testFunc), testFunc());
+        assert.throws(() => callWithTelemetrySync('callbackId', testFuncError), /testFuncError/);
+    });
+
+    test('async', async () => {
+        assert.strictEqual(await callWithTelemetry('callbackId', testFunc), testFunc());
+        assert.strictEqual(await callWithTelemetry('callbackId', testFuncAsync), await testFuncAsync());
+
+        await assertThrowsAsync(async () => await callWithTelemetry('callbackId', testFuncError), /testFuncError/);
+        await assertThrowsAsync(async () => await callWithTelemetry('callbackId', testFuncErrorAsync), /testFuncErrorAsync/);
+    });
+
+    // https://github.com/microsoft/vscode-azuretools/issues/967
+    test('Unexpected error during masking', async () => {
+        const func = (context: IActionContext) => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            context.telemetry.properties.prop1 = <any>3;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            context.telemetry.measurements.meas1 = <any>'fdafs';
+        }
+        try {
+            await callWithTelemetry('callbackId', func);
+            assert(false);
+        } catch (error) {
+            // Expected an error to be thrown.
+        }
+    });
+
+    test('Unexpected error during telemetry handling', async () => {
+        const func = (context: IActionContext) => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            context.telemetry = <any>undefined;
+        }
+        try {
+            await callWithTelemetry('callbackId', func);
+            assert(false);
+        } catch (error) {
+            // Expected an error to be thrown.
+        }
     });
 });

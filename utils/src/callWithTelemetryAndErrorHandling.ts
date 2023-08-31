@@ -56,6 +56,34 @@ function initContext(callbackId: string): [number, types.IActionContext] {
     return [start, context];
 }
 
+/**
+ * Calls the callback and sends a telemetry event.
+ * If the callback throws, the error wil be re-thrown.
+ */
+export function callWithTelemetrySync<T>(callbackId: string, callback: (context: types.IActionContext) => T): T {
+    const [start, context] = initContext(callbackId);
+
+    try {
+        return callback(context);
+    } finally {
+        handleTelemetry(context, callbackId, start);
+    }
+}
+
+/**
+ * Calls the callback and sends a telemetry event.
+ * If the callback's returned promise rejects, the returned promise will also reject with the same error.
+ */
+export async function callWithTelemetry<T>(callbackId: string, callback: (context: types.IActionContext) => T | PromiseLike<T>): Promise<T> {
+    const [start, context] = initContext(callbackId);
+
+    try {
+        return await Promise.resolve(callback(context));
+    } finally {
+        handleTelemetry(context, callbackId, start);
+    }
+}
+
 export function callWithTelemetryAndErrorHandlingSync<T>(callbackId: string, callback: (context: types.IActionContext) => T): T | undefined {
     const [start, context] = initContext(callbackId);
 
